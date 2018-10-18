@@ -56,43 +56,43 @@ router.post('/', (req, res, next) => {
 
 router.put('/:id', (req, res, next) => {
     const { name } = req.body;
-  
+
     /***** Never trust users. Validate input *****/
     if (!name) {
-      const err = new Error('Missing `name` in request body');
-      err.status = 400;
-      return next(err);
+        const err = new Error('Missing `name` in request body');
+        err.status = 400;
+        return next(err);
     }
-  
+
     const updateItem = { name };
-  
-    knex('tags')
-      .update(updateItem)
-      .where('id', req.params.id)
-      .returning(['id', 'name'])
-      .then(([result]) => {
-        if (result) {
-          res.json(result);
-        } else {
-          next();
-        }
-      })
-      .catch(err => {
-        next(err);
-      });
-  });
-
-  router.delete('/:id', (req, res, next) => {
-
 
     knex('tags')
-      .where('id', req.params.id)
-      .del()
-      .then(res.sendStatus(204))
-      .catch(err => {
-        next(err);
-      });
-  });
+        .update(updateItem)
+        .where('id', req.params.id)
+        .returning(['id', 'name'])
+        .then(([result]) => {
+            if (result) {
+                res.json(result);
+            } else {
+                next();
+            }
+        })
+        .catch(err => {
+            next(err);
+        });
+});
+
+router.delete('/:id', (req, res, next) => {
+
+
+    knex('tags')
+        .where('id', req.params.id)
+        .del()
+        .then(res.sendStatus(204))
+        .catch(err => {
+            next(err);
+        });
+});
 
 
 
