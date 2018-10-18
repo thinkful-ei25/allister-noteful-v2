@@ -7,6 +7,8 @@ const router = express.Router();
 
 const knex = require('../knex');
 
+const hydrateNotes = require('../utils/hydrateNotes');
+
 // TEMP: Simple In-Memory Database
 // const data = require('../db/notes');
 // const simDB = require('../db/simDB');
@@ -18,9 +20,11 @@ router.get('/', (req, res, next) => {
   const { searchTerm } = req.query;
   const { folderId } = req.query;
   knex
-    .select('notes.id', 'title', 'content', 'folders.id as folderId', 'folders.name as folderName')
+    .select('notes.id', 'notes.title', 'notes.content', 'notes.folder_id', 'folders.id as folderId', 'folders.name as folderName', 'tags.id as tagId', 'tags.name as tagName')
     .from('notes')
     .leftJoin('folders', 'notes.folder_id', 'folders.id')
+    .leftJoin('notes_tags', 'notes.id', 'notes_tags.note_id')
+    .leftJoin('tags', 'tags.id', 'notes_tags.tag_id')
     .modify(queryBuilder => {
       if (searchTerm) {
         queryBuilder.where('title', 'like', `%${searchTerm}%`);
@@ -33,7 +37,8 @@ router.get('/', (req, res, next) => {
     })
     .orderBy('notes.id')
     .then(results => {
-      res.json(results)
+      const hydrated = hydrateNotes(results)
+      res.json(hydrated)
     })
     .catch(err => {
       console.error(err);
