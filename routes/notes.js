@@ -112,7 +112,7 @@ router.get('/:id', (req, res, next) => {
 
 router.put('/:id', (req, res, next) => {
   const noteId = req.params.id;
-  const { title, content, folderId } = req.body;
+  const { title, content, folderId, tags } = req.body;
 
   /***** Never trust users. Validate input *****/
   if (!title) {
@@ -126,21 +126,34 @@ router.put('/:id', (req, res, next) => {
     content: content,
     folder_id: (folderId) ? folderId : null
   };
-
+  
   knex('notes')
     .update(updateItem)
     .where('id', noteId)
-    .returning(['id'])
+    .returning('id')
+    .then(([id]) => {
+      return knex('notes_tags')
+      .where('notes_tags.note_id', id)
+      .del()
+
+    })
+    .then(() =>{
+      const tagsInsert = tags.map(tagId => ({ note_id: noteId, tag_id: tagId }));
+      return knex.insert(tagsInsert).into('notes_tags');
+    })
     .then(() => {
       // Using the noteId, select the note and the folder info
-      return knex.select('notes.id', 'title', 'content', 'folder_id as folderId', 'folders.name as folderName')
+      return knex.select('notes.id', 'title', 'content', 'folders.id as folderId', 'folders.name as folderName', 'tags.id as tagId', 'tags.name as tagName')
         .from('notes')
         .leftJoin('folders', 'notes.folder_id', 'folders.id')
+        .leftJoin('notes_tags', 'notes.id', 'notes_tags.note_id')
+        .leftJoin('tags', 'tags.id', 'notes_tags.tag_id')
         .where('notes.id', noteId);
     })
-    .then(([result]) => {
+    .then((result) => {
       if (result) {
-        res.json(result);
+        const hydrated = hydrateNotes(result);
+        res.status(200).json(hydrated);
       } else {
         next();
       }
@@ -194,8 +207,8 @@ router.post('/', (req, res, next) => {
     })
     .then(() => {
       // Select the new note and leftJoin on folders and tags
-      return knex.select('notes.id', 'title', 'content',
-        'folders.id as folder_id', 'folders.name as folderName',
+      return knex.select('notes.id', 'notes.title', 'notes.content',
+        'folders.id as folderId', 'folders.name as folderName',
         'tags.id as tagId', 'tags.name as tagName')
         .from('notes')
         .leftJoin('folders', 'notes.folder_id', 'folders.id')
