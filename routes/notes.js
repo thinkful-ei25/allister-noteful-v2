@@ -19,7 +19,7 @@ const hydrateNotes = require('../utils/hydrateNotes');
 router.get('/', (req, res, next) => {
   const { searchTerm } = req.query;
   const { folderId } = req.query;
-  const { tagId } = req.query; 
+  const { tagId } = req.query;
   knex
     .select('notes.id', 'notes.title', 'notes.content', 'folders.id as folderId', 'folders.name as folderName', 'tags.id as tagId', 'tags.name as tagName')
     .from('notes')
@@ -76,10 +76,9 @@ router.get('/:id', (req, res, next) => {
     .leftJoin('tags', 'tags.id', 'notes_tags.tag_id')
     .where('notes.id', id)
     .then(item => {
-      if (item) {
+      if (item.length) {
         const hydrated = hydrateNotes(item)
         res.json(hydrated[0])
-        
       }
       else {
         next();
@@ -88,7 +87,7 @@ router.get('/:id', (req, res, next) => {
     .catch(err => {
       next(err);
 
-    })
+    });
 });
 
 
@@ -126,18 +125,22 @@ router.put('/:id', (req, res, next) => {
     content: content,
     folder_id: (folderId) ? folderId : null
   };
-  
+
   knex('notes')
     .update(updateItem)
     .where('id', noteId)
     .returning('id')
     .then(([id]) => {
-      return knex('notes_tags')
-      .where('notes_tags.note_id', id)
-      .del()
+      if (id) {
+        return knex('notes_tags')
+          .where('notes_tags.note_id', id)
+          .del()
+      } else {
+        next()
+      }
 
     })
-    .then(() =>{
+    .then(() => {
       const tagsInsert = tags.map(tagId => ({ note_id: noteId, tag_id: tagId }));
       return knex.insert(tagsInsert).into('notes_tags');
     })
@@ -248,7 +251,15 @@ router.delete('/:id', (req, res, next) => {
   knex('notes')
     .where('notes.id', id)
     .del()
-    .then(res.sendStatus(204))
+    .returning('id')
+    .then(([id]) => {
+      if (id) {
+        // res.append('deleted', id).status(204).end()
+        res.sendStatus(204)
+      } else {
+        next()
+      }
+    })
     .catch(err => {
       next(err);
     })
@@ -265,3 +276,4 @@ router.delete('/:id', (req, res, next) => {
 // });
 
 module.exports = router;
+
